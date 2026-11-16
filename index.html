@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NeonDash</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a1a">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a1a;overflow:hidden;font-family:Arial;touch-action:none;color:#fff}
+#game{width:100vw;height:100vh;position:relative;overflow:hidden;background:linear-gradient(#0a0a1a 0%,#1a0033 55%,#000 55%)}
+#hud{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;font-weight:bold;font-size:22px;text-shadow:0 0 10px #00FFFF;z-index:20}
+#ground{position:absolute;bottom:0;left:0;right:0;height:90px;background:#111;border-top:4px solid #00FFFF;box-shadow:0 0 20px #00FFFF;z-index:2}
+#player{position:absolute;width:48px;height:48px;background:#00FFFF;border:3px solid #fff;box-shadow:0 0 20px #00FFFF,0 0 40px #00FFFF;border-radius:6px;z-index:10;left:80px}
+#player::after{content:"😎";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28px}
+.spike{position:absolute;width:40px;height:40px;background:#FF0055;clip-path:polygon(50% 0,100% 100%,0 100%);box-shadow:0 0 15px #FF0055;z-index:5}
+.block{position:absolute;background:#FFD700;border:3px solid #fff;box-shadow:0 0 15px #FFD700;z-index:5}
+.orb{position:absolute;width:36px;height:36px;background:#FF00FF;border-radius:50%;box-shadow:0 0 20px #FF00FF;border:2px solid #fff;z-index:5}
+#tap{position:absolute;bottom:120px;left:0;right:0;text-align:center;font-size:22px;font-weight:bold;color:#00FFFF;text-shadow:0 0 10px #00FFFF;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+#msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.9);border:2px solid #00FFFF;padding:25px;border-radius:20px;text-align:center;z-index:30;display:none;box-shadow:0 0 30px #00FFFF}
+#msg h1{font-size:32px;margin-bottom:10px;color:#00FFFF}
+#msg button{padding:12px 25px;font-size:20px;background:#00FFFF;border:none;border-radius:10px;margin-top:15px;font-weight:bold;color:#000}
+#progress{position:absolute;top:45px;left:12px;right:12px;height:8px;background:#333;border-radius:10px;overflow:hidden}
+#bar{height:100%;background:#00FFFF;width:0%;box-shadow:0 0 10px #00FFFF}
+</style>
+</head>
+<body>
+<div id="game">
+<div id="hud"><span>⭐ <span id="score">0</span></span><span>🏆 BEST: <span id="best">0</span></span><span>⚡ <span id="speedTxt">1x</span></span></div>
+<div id="progress"><div id="bar"></div></div>
+<div id="player"></div>
+<div id="ground"></div>
+<div id="tap">👆 TAPNI ZA SKOK!</div>
+<div id="msg"><h1 id="msgTitle">💥 KRAJ!</h1><p id="msgText"></p><button onclick="location.reload()">IGRAJ OPET 🔄</button></div>
+</div>
+<script>
+let py=0,vy=0,onGround=true,score=0,dead=false,started=false,speed=6,frame=0;
+let obstacles=[];
+let best=localStorage.getItem('neondash_best')||0;
+document.getElementById('best').textContent=best;
+let groundY=window.innerHeight-90-48;
+let player=document.getElementById('player');
+player.style.top=groundY+'px';
+function snd(f){try{let a=new (window.AudioContext||window.webkitAudioContext)();let o=a.createOscillator();o.type='square';o.frequency.value=f;o.connect(a.destination);o.start();o.stop(a.currentTime+0.12);}catch(e){}}
+function spawn(){
+ let r=Math.random();
+ let x=window.innerWidth+50;
+ if(r<0.45){obstacles.push({type:'spike',x:x,y:window.innerHeight-90-40,w:40,h:40});}
+ else if(r<0.7){obstacles.push({type:'block',x:x,y:window.innerHeight-90-50,w:50,h:50});}
+ else if(r<0.85){obstacles.push({type:'spike',x:x,y:window.innerHeight-90-40,w:40,h:40});obstacles.push({type:'spike',x:x+45,y:window.innerHeight-90-40,w:40,h:40});}
+ else{obstacles.push({type:'orb',x:x,y:window.innerHeight-90-130,w:36,h:36});}
+}
+function jump(){
+ if(dead)return;
+ if(!started){started=true;document.getElementById('tap').style.display='none';}
+ if(onGround){vy=-15;onGround=false;snd(500);}
+}
+document.addEventListener('touchstart',e=>{e.preventDefault();jump();},{passive:false});
+document.addEventListener('mousedown',jump);
+document.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();jump();}});
+function loop(){
+ if(dead)return;
+ frame++;
+ if(started){
+  if(frame%55===0)spawn();
+  speed=6+Math.floor(score/200);
+  document.getElementById('speedTxt').textContent=speed/6>1?(speed/6).toFixed(1)+'x':'1x';
+  score++;document.getElementById('score').textContent=score;
+  document.getElementById('bar').style.width=Math.min(100,score/30)+'%';
+  if(score>best){best=score;localStorage.setItem('neondash_best',best);document.getElementById('best').textContent=best;}
+ }
+ vy+=0.9;py+=vy;
+ if(py>=0){py=0;vy=0;onGround=true;}
+ if(py< -250)py=-250;
+ player.style.top=(groundY+py)+'px';
+ player.style.transform='rotate('+(-py*2)+'deg)';
+ // Obstacles
+ document.querySelectorAll('.spike,.block,.orb').forEach(e=>e.remove());
+ for(let i=obstacles.length-1;i>=0;i--){
+  let o=obstacles[i];
+  o.x-=speed;
+  if(o.x<-60){obstacles.splice(i,1);continue;}
+  let el=document.createElement('div');
+  el.className=o.type;el.style.left=o.x+'px';el.style.top=o.y+'px';
+  if(o.type==='block'){el.style.width=o.w+'px';el.style.height=o.h+'px';}
+  if(o.type==='orb')el.textContent='💎';
+  document.getElementById('game').appendChild(el);
+  // Kolizija
+  let px=80,pyTop=groundY+py,pw=48,ph=48;
+  if(px+pw-8>o.x&&px+8<o.x+o.w&&pyTop+ph-8>o.y&&pyTop+8<o.y+o.h){
+   if(o.type==='orb'){obstacles.splice(i,1);score+=50;snd(900);continue;}
+   dead=true;snd(150);
+   document.getElementById('msgTitle').textContent='💥 KRAJ!';
+   document.getElementById('msgText').textContent='Bodovi: '+score+' | Best: '+best+' | Tapni Igraj Opet!';
+   document.getElementById('msg').style.display='block';
+   return;
+  }
+ }
+ requestAnimationFrame(loop);
+}
+loop();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
